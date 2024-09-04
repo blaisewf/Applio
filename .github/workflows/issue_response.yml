@@ -45,13 +45,39 @@ jobs:
             const data = await response.json();
             const llmResponse = data.choices[0].message.content;
 
-            const commentMessage = `Thank you for your issue. Here is some information that might help:\n\n${llmResponse}`;
+            const initialCommentMessage = `${llmResponse}`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: repo,
               issue_number: issueNumber,
-              body: commentMessage,
+              body: initialCommentMessage,
             });
+
+            const followUpMessage = `
+              If this issue persists or you need further assistance, please visit our support community at [discord.gg/iahispano](https://discord.gg/iahispano).
+              Our community is available to help with any additional questions or concerns.
+            `;
+
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: repo,
+              issue_number: issueNumber,
+            });
+
+            const hasFollowUpComment = comments.data.some(comment => 
+              comment.body.includes('If this issue persists or you need further assistance')
+            );
+
+            if (!hasFollowUpComment) {
+              setTimeout(async () => {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: repo,
+                  issue_number: issueNumber,
+                  body: followUpMessage,
+                });
+              }, 72 * 60 * 60 * 1000); // Delay in milliseconds (72 hours in this case)
+            }
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
