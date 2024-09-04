@@ -3,6 +3,8 @@ name: Issue Response
 on:
   issues:
     types: [opened, edited]
+  issue_comment:
+    types: [created]
 
 jobs:
   auto_reply:
@@ -15,69 +17,93 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const issue = context.payload.issue;
+            const comment = context.payload.comment;
             const repo = context.repo.repo;
             const issueNumber = issue.number;
             const issueBody = issue.body;
 
+            const groqApiKey = process.env.GROQ_API_KEY;
+            const issueAuthor = issue.user.login;
+            const commentAuthor = comment ? comment.user.login : null;
+
+            // System prompt for the initial issue
             const systemPrompt = `Provide a helpful response based on the repository and issue description: ${issueBody}`;
 
-            const groqApiKey = process.env.GROQ_API_KEY;
+            // Function to fetch response from the Groq OpenAI API
+            async function getAIResponse(prompt) {
+              const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${groqApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  messages: [
+                    { role: 'system', content: prompt },
+                    { role: 'user', content: issueBody },
+                  ],
+                  model: 'llama3-8b-8192',
+                }),
+              });
 
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${groqApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: issueBody },
-                ],
-                model: 'llama3-8b-8192',
-              }),
-            });
+              if (!response.ok) {
+                throw new Error('Failed to fetch response from LLM');
+              }
 
-            if (!response.ok) {
-              throw new Error('Failed to fetch response from LLM');
+              const data = await response.json();
+              return data.choices[0].message.content;
             }
 
-            const data = await response.json();
-            const llmResponse = data.choices[0].message.content;
+            if (comment) {
+              // Only respond if the comment author is the same as the issue author
+              if (commentAuthor === issueAuthor) {
+                const followUpPrompt = `The user has sent another comment. Try to provide further help and recommend they wait for a staff member or join the Discord for faster help.`;
+                const aiResponse = await getAIResponse(followUpPrompt);
 
-            const initialCommentMessage = `${llmResponse}`;
+                const commentMessage = `${aiResponse}\n\nIf you're looking for faster assistance, consider joining our support community on [Discord](https://discord.gg/iahispano), or please wait for a staff member to assist.`;
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: repo,
-              issue_number: issueNumber,
-              body: initialCommentMessage,
-            });
-
-            const followUpMessage = `
-              If this issue persists or you need further assistance, please visit our support community at [discord.gg/iahispano](https://discord.gg/iahispano).
-              Our community is available to help with any additional questions or concerns.
-            `;
-
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: repo,
-              issue_number: issueNumber,
-            });
-
-            const hasFollowUpComment = comments.data.some(comment => 
-              comment.body.includes('If this issue persists or you need further assistance')
-            );
-
-            if (!hasFollowUpComment) {
-              setTimeout(async () => {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: repo,
                   issue_number: issueNumber,
-                  body: followUpMessage,
+                  body: commentMessage,
                 });
-              }, 72 * 60 * 60 * 1000); // Delay in milliseconds (72 hours in this case)
+              }
+            } else {
+              const initialResponse = await getAIResponse(systemPrompt);
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: repo,
+                issue_number: issueNumber,
+                body: initialResponse,
+              });
+
+              const followUpMessage = `
+                If this issue persists or you need further assistance, please visit our support community at [discord.gg/iahispano](https://discord.gg/iahispano).
+                Our community is available to help with any additional questions or concerns.
+              `;
+
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: repo,
+                issue_number: issueNumber,
+              });
+
+              const hasFollowUpComment = comments.data.some(comment => 
+                comment.body.includes('If this issue persists or you need further assistance')
+              );
+
+              if (!hasFollowUpComment) {
+                setTimeout(async () => {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: repo,
+                    issue_number: issueNumber,
+                    body: followUpMessage,
+                  });
+                }, 72 * 60 * 60 * 1000);
+              }
             }
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
