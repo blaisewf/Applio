@@ -26,10 +26,8 @@ jobs:
             const issueAuthor = issue.user.login;
             const commentAuthor = comment ? comment.user.login : null;
 
-            // System prompt for the initial issue
-            const systemPrompt = `Provide a helpful response based on the repository and issue description: ${issueBody}`;
+            const systemPrompt = `You are a knowledgeable and helpful assistant, specializing in resolving issues for a GitHub repository called Applio, a Python-based project focused on voice cloning. Your role is to assist users with any bugs or problems they encounter in a clear, concise, and constructive manner. You can handle a wide range of technical issues, from code errors to performance bugs and setup problems. Provide thoughtful, detailed assistance for the following GitHub issue, making sure to offer clear guidance, code suggestions, or links to documentation if needed, while remaining polite and professional at all times. Issue content: ${issueBody}`;
 
-            // Function to fetch response from the Groq OpenAI API
             async function getAIResponse(prompt) {
               const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
@@ -42,7 +40,7 @@ jobs:
                     { role: 'system', content: prompt },
                     { role: 'user', content: issueBody },
                   ],
-                  model: 'llama3-8b-8192',
+                  model: 'llama-3.1-70b-versatile',
                 }),
               });
 
@@ -54,10 +52,23 @@ jobs:
               return data.choices[0].message.content;
             }
 
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: repo,
+              issue_number: issueNumber,
+            });
+
+            const discordRecommendation = 'consider joining our support community on [Discord](https://discord.gg/iahispano)';
+            const hasDiscordRecommendation = comments.data.some(comment => comment.body.includes(discordRecommendation));
+
+            if (hasDiscordRecommendation) {
+              console.log("Discord recommendation already posted. No further responses.");
+              return;
+            }
+
             if (comment) {
-              // Only respond if the comment author is the same as the issue author
               if (commentAuthor === issueAuthor) {
-                const followUpPrompt = `The user has sent another comment. Try to provide further help and recommend they wait for a staff member or join the Discord for faster help.`;
+                const followUpPrompt = `The user has sent another comment. Try to get him to provide more information about his error and try to help him as much as possible.`;
                 const aiResponse = await getAIResponse(followUpPrompt);
 
                 const commentMessage = `${aiResponse}\n\nIf you're looking for faster assistance, consider joining our support community on [Discord](https://discord.gg/iahispano), or please wait for a staff member to assist.`;
@@ -83,12 +94,6 @@ jobs:
                 If this issue persists or you need further assistance, please visit our support community at [discord.gg/iahispano](https://discord.gg/iahispano).
                 Our community is available to help with any additional questions or concerns.
               `;
-
-              const comments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: repo,
-                issue_number: issueNumber,
-              });
 
               const hasFollowUpComment = comments.data.some(comment => 
                 comment.body.includes('If this issue persists or you need further assistance')
