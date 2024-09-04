@@ -26,7 +26,7 @@ jobs:
             const issueAuthor = issue.user.login;
             const commentAuthor = comment ? comment.user.login : null;
 
-            const systemPrompt = `You are a knowledgeable and helpful assistant, specializing in resolving issues for a GitHub repository called Applio, a Python-based project focused on voice cloning. Your role is to assist users with any bugs or problems they encounter in a clear, concise, and constructive manner. You can handle a wide range of technical issues, from code errors to performance bugs and setup problems. Provide thoughtful, detailed assistance for the following GitHub issue, making sure to offer clear guidance, code suggestions, or links to documentation if needed, while remaining polite and professional at all times. Issue content: ${issueBody}`;
+            const systemPrompt = `You are an assistant for a GitHub repository called Applio, a Python project focused on voice cloning. Your job is to assist users with any issues or bugs they report, providing clear, helpful and short guidance. You can troubleshoot various technical problems and offer solutions, code snippets, or documentation references as needed. Be concise, efficient, and to the point when responding to the following GitHub issue. If relevant, refer users to the official documentation at [https://docs.applio.org/](https://docs.applio.org/). Issue content: ${issueBody}`;
 
             async function getAIResponse(prompt) {
               const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
