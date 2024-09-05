@@ -105,7 +105,7 @@ jobs:
 
             if (comment) {
               if (commentAuthor === issueAuthor) {
-                const followUpPrompt = `The user has sent another comment. Try to get him to provide more information about his error and try to help him as much as possible.`;
+                const followUpPrompt = `The user has sent another comment. Try to get him to provide more information about his error and try to help him as much as possible precisely and concisely, whenever possible in a paragraph.`;
                 const aiResponse = await getAIResponse(followUpPrompt);
 
                 const commentMessage = `${aiResponse}\n\nIf you're looking for faster assistance, consider joining our support community on [Discord](https://discord.gg/iahispano), or please wait for a staff member to assist.`;
