@@ -24,14 +24,24 @@ jobs:
               '**Steps to Reproduce**',
               '**Desktop Details:**',
             ];
-            
             const body = issue.body || '';
             const missingFields = requiredSections.filter(section => {
               const sectionContent = body.split(section)[1];
               return !sectionContent || sectionContent.trim().length < 5;
             });
-            
-            if (missingFields.length > 0) {
+
+            // Fetch issue comments
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+            });
+
+            const warningMessageExists = comments.data.some(comment => 
+              comment.body.includes('Thank you for your issue report. However, it appears that your issue description is')
+            );
+
+            if (missingFields.length > 0 && !warningMessageExists) {
               let message = `Thank you for your issue report. However, it appears that your issue description is ${context.payload.action === 'reopened' ? 'still ' : ''}missing or has incomplete information for the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.`;
               
               if (context.payload.action !== 'reopened' && context.payload.action !== 'edited') {
@@ -44,11 +54,7 @@ jobs:
                 issue_number: issue.number,
                 body: message
               });
-              
-              if (context.payload.action !== 'reopened' && context.payload.action !== 'edited') {
-                // Schedule closure logic here (omitted for brevity)
-              }
-              
+
               core.setOutput('template_followed', 'false');
             } else {
               core.setOutput('template_followed', 'true');
