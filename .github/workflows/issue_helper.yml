@@ -2,7 +2,7 @@ name: Issue Management
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened, edited, reopened]
   issue_comment:
     types: [created]
 
@@ -29,7 +29,12 @@ jobs:
             const missingFields = requiredSections.filter(section => !body.includes(section));
             
             if (missingFields.length > 0) {
-              const message = `Thank you for your issue report. However, it appears that your issue description is missing the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.\n\nThis issue will be closed automatically. Feel free to reopen it once you've updated it with the required information.`;
+              let message;
+              if (context.payload.action === 'reopened') {
+                message = `Thank you for updating your issue report. However, it appears that your issue description is still missing the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.`;
+              } else {
+                message = `Thank you for your issue report. However, it appears that your issue description is missing the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.\n\nThis issue will be closed automatically if not updated within 24 hours. Feel free to reopen it once you've updated it with the required information.`;
+              }
               
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -38,12 +43,24 @@ jobs:
                 body: message
               });
               
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                state: 'closed'
-              });
+              if (context.payload.action !== 'reopened') {
+                setTimeout(async () => {
+                  const updatedIssue = await github.rest.issues.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number
+                  });
+                  
+                  if (requiredSections.some(section => !updatedIssue.data.body.includes(section))) {
+                    await github.rest.issues.update({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      state: 'closed'
+                    });
+                  }
+                }, 24 * 60 * 60 * 1000); // 24 hours
+              }
               
               core.setOutput('template_followed', 'false');
             } else {
