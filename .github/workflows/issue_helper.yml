@@ -25,15 +25,16 @@ jobs:
               '**Desktop Details:**',
             ];
             
-            const body = issue.body;
-            const missingFields = requiredSections.filter(section => !body.includes(section));
+            const body = issue.body || '';
+            const missingFields = requiredSections.filter(section => 
+              !body.includes(section) || body.split(section)[1].trim().toLowerCase() === 'na'
+            );
             
             if (missingFields.length > 0) {
-              let message;
-              if (context.payload.action === 'reopened') {
-                message = `Thank you for updating your issue report. However, it appears that your issue description is still missing the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.`;
-              } else {
-                message = `Thank you for your issue report. However, it appears that your issue description is missing the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.\n\nThis issue will be closed automatically if not updated within 24 hours. Feel free to reopen it once you've updated it with the required information.`;
+              let message = `Thank you for your issue report. However, it appears that your issue description is ${context.payload.action === 'reopened' ? 'still ' : ''}missing or has incomplete information for the following required sections:\n${missingFields.map(field => `- ${field}`).join('\n')}\n\nPlease edit your issue to include all required information using our issue template. This helps us address your concern more effectively.\nIf you need assistance with the template or have any questions, please join our Discord server for support.`;
+              
+              if (context.payload.action !== 'reopened') {
+                message += '\n\nThis issue will be closed automatically if not updated with complete information within 24 hours. Feel free to reopen it once you've updated it with the required information.';
               }
               
               await github.rest.issues.createComment({
@@ -51,7 +52,12 @@ jobs:
                     issue_number: issue.number
                   });
                   
-                  if (requiredSections.some(section => !updatedIssue.data.body.includes(section))) {
+                  const updatedBody = updatedIssue.data.body || '';
+                  const stillMissingFields = requiredSections.filter(section => 
+                    !updatedBody.includes(section) || updatedBody.split(section)[1].trim().toLowerCase() === 'na'
+                  );
+                  
+                  if (stillMissingFields.length > 0) {
                     await github.rest.issues.update({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
