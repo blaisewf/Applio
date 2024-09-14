@@ -19,25 +19,36 @@ from rvc.train.process.extract_small_model import extract_small_model
 from rvc.lib.tools.analyzer import analyze_audio
 from rvc.lib.tools.launch_tensorboard import launch_tensorboard_pipeline
 from rvc.lib.tools.model_download import model_download_pipeline
+
 python = sys.executable
-#Get TTS Voices -> https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=6A5AA1D4EAFF4E9FB37E23D68491D6F4
+
+
+# Get TTS Voices -> https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=6A5AA1D4EAFF4E9FB37E23D68491D6F4
 @lru_cache(maxsize=1)  # Cache only one result since the file is static
 def load_voices_data():
     with open(os.path.join("rvc", "lib", "tools", "tts_voices.json")) as f:
         return json.load(f)
+
+
 voices_data = load_voices_data()
 locales = list({voice["Locale"] for voice in voices_data})
+
+
 @lru_cache(maxsize=None)
 def import_voice_converter():
     from rvc.infer.infer import VoiceConverter
 
     return VoiceConverter()
+
+
 @lru_cache(maxsize=1)
 def get_config():
     from rvc.configs.config import Config
 
     return Config()
-#Infer
+
+
+# Infer
 def run_infer_script(
     pitch: int,
     filter_radius: int,
