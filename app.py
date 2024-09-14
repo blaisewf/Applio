@@ -32,12 +32,15 @@ from tabs.settings.flask_server import flask_server_tab
 from tabs.settings.fake_gpu import fake_gpu_tab, gpu_available, load_fake_gpu
 from tabs.settings.themes import theme_tab
 from tabs.settings.precision import precision_tab
+
 # Run prerequisites
 from core import run_prerequisites_script
+
 run_prerequisites_script(False, True, True, True)
-#Initialize i18n
+# Initialize i18n
 from assets.i18n.i18n import I18nAuto
-i18n=I18nAuto()
+
+i18n = I18nAuto()
 # Start Discord presence if enabled
 if load_config_presence():
     from assets.discord_presence import RPCManager
